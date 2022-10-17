@@ -52,6 +52,11 @@
               Load Data
             </b-button>
           </div>
+          <div class="col-md-12 text-center mt-4">
+            <b-button variant="primary " @click="handleExport()">
+              Download Excel
+            </b-button>
+          </div>
         </div>
       </div>
     </div>
@@ -62,7 +67,8 @@
 import { TradingVue, DataCube } from 'trading-vue-js'
 import Data from '../data.json'
 import axios from 'axios'
-import service from '@/utils/service'
+import service from '@/utils/service';
+import { convertTime } from "@/helper/toTimeStamp"
 export default {
   name: 'ChartComponent',
   components: { TradingVue },
@@ -72,14 +78,16 @@ export default {
       this.height = window.innerHeight - 50
     },
     async handleLoadData() {
+      console.log(convertTime(this.startDate));
+      console.log(convertTime(this.endDate));
 
       switch (this.exchange) {
         case "binance":
           this.dataSending = {
             symbol: this.symbol,
             interval: '1m',
-            from: 1659549600000,
-            to: 1659636000000,
+            from: convertTime(this.startDate) * 1000,
+            to: convertTime(this.endDate) * 1000,
             limit: 1000
           }
           break;
@@ -98,9 +106,27 @@ export default {
         'http://localhost:6969/api/binance/ticker',
         dataRequest
       )
+      this.dataExport = response.data.data
       Data.ohlcv = response.data.data;
       this.chart = new DataCube(Data);
     },
+    handleExport() {
+      const rows = this.dataExport
+      console.log(rows);
+      let csvContent = "data:text/csv;charset=utf-8,";
+
+      rows.forEach(function (rowArray) {
+        let row = rowArray.join(",");
+        csvContent += row + "\r\n";
+      });
+      var encodedUri = encodeURI(csvContent);
+      var link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "my_data.csv");
+      document.body.appendChild(link);
+
+      link.click();
+    }
   },
   computed: {
     changeSelectExchage() {
@@ -149,6 +175,7 @@ export default {
       startDate: null,
       endDate: null,
       dataSending: null,
+      dataExport: [],
     }
   },
 }
