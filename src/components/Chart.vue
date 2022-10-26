@@ -8,8 +8,20 @@
     </div>
     <div class="row">
       <div class="col-md-9">
-        <trading-vue :data="chart" :width="width" :height="height" :color-back="colors.colorBack"
+        <!-- <trading-vue :data="chart" :width="width" :height="height" :color-back="colors.colorBack"
           :color-grid="colors.colorGrid" :color-text="colors.colorText" :toolbar="true"></trading-vue>
+         -->
+
+        <div class="log-info">
+          <div class="card">
+            <div class="card-body">
+              <div>
+                <div v-for="(message, index) in messages" class=" log-info__border" :key="index">
+                  {{ message }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="col-md-3">
         <div class="row">
@@ -48,13 +60,18 @@
           </div>
 
           <div class="col-md-12 text-center mt-4">
-            <b-button variant="primary" @click="handleLoadData()">
-              Load Data
+            <b-button variant="primary" :disabled="isProcessing" @click="handleCallCrobJob()">
+              {{isProcessing ? "Đang lấy Dữ liệu " : "Lấy dữ liệu"}}
+            </b-button>
+          </div>
+          <div class="col-md-12 text-center mt-4">
+            <b-button variant="danger" @click="stopRequest()">
+              Dừng lấy dữ liệu
             </b-button>
           </div>
           <div class="col-md-12 text-center mt-4">
             <b-button variant="primary " @click="handleExport()">
-              Download Excel
+              Tải về CSV
             </b-button>
           </div>
         </div>
@@ -64,23 +81,25 @@
 </template>
 
 <script>
-import { TradingVue, DataCube } from 'trading-vue-js'
+// import { TradingVue, DataCube } from 'trading-vue-js'
 import Data from '../data.json'
 import axios from 'axios'
 import service from '@/utils/service';
 import { convertTime } from "@/helper/toTimeStamp"
+import moment from 'moment';
+
+const controller = new AbortController();
+let signal = controller.signal;
+
 export default {
   name: 'ChartComponent',
-  components: { TradingVue },
+  // components: { TradingVue },
   methods: {
     onResize() {
       this.width = window.innerWidth - 550
       this.height = window.innerHeight - 50
     },
     async handleLoadData() {
-      console.log(convertTime(this.startDate));
-      console.log(convertTime(this.endDate));
-
       switch (this.exchange) {
         case "binance":
           this.dataSending = {
@@ -108,24 +127,85 @@ export default {
       )
       this.dataExport = response.data.data
       Data.ohlcv = response.data.data;
-      this.chart = new DataCube(Data);
+      // this.chart = new DataCube(Data);
     },
-    handleExport() {
-      const rows = this.dataExport
-      console.log(rows);
-      let csvContent = "data:text/csv;charset=utf-8,";
+    async handleExport() {
+      if(!this.symbol) {
+        return alert("Vui lòng chọn đồng tiền");
+      }
+      try {
+        const response = await axios.post("http://localhost:3000/api/coin/binance/db", {
+          symbol: this.symbol,
+        })
+        this.dataExport = response.data.data.ohlcv
+        const rows = this.dataExport
 
-      rows.forEach(function (rowArray) {
-        let row = rowArray.join(",");
-        csvContent += row + "\r\n";
-      });
-      var encodedUri = encodeURI(csvContent);
-      var link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "my_data.csv");
-      document.body.appendChild(link);
+        let csvContent = "data:text/csv;charset=utf-8,";
 
-      link.click();
+        rows.forEach(function (rowArray) {
+          let row = rowArray.join(",");
+          csvContent += row + "\r\n";
+        });
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "my_data.csv");
+        document.body.appendChild(link);
+
+        link.click();
+      } catch (error) {
+        console.log(error)
+      }
+
+    },
+    async handleCallCrobJob() {
+      this.isProcessing = true;
+      let START_DATE = "2019-09-09";
+      if (!this.symbol) {
+        this.isProcessing = false;
+        return alert("Vui lòng chọn đồng tiền");
+      }
+      try {
+        const response = await axios.post('http://localhost:3000/api/coin/binance/db', {
+          symbol: this.symbol,
+        });
+
+        const current_time = moment().format('x');
+        if (response.data.data && Object.keys(response.data.data).length > 0) {
+          const last_updated = moment(response.data.data.last_updated).format('x');
+          const diff = Math.ceil((current_time - last_updated) / (24 * 60 * 60 * 1000));
+          for (let i = 0; i <= diff; i++) {
+            let startTimeRequestApi = moment(response.data.data.last_updated)
+              .add(i, 'days')
+              .format('YYYY-MM-DD');
+            const res = await axios.post('http://localhost:3000/api/future/coin/init', {
+              symbol: this.symbol,
+              startTime: startTimeRequestApi
+            }, { signal });
+            this.messages.push(`Lấy thành công data ngày ${startTimeRequestApi} - DATA: ${res.data.count_data}`);
+          }
+          this.isProcessing = false;
+        } else {
+          const res = await axios.post('http://localhost:3000/api/future/coin/init', {
+            symbol: this.symbol,
+            startTime: START_DATE
+          }, {
+            signal
+          });
+          this.messages.push(`Lấy thành công data ngày ${START_DATE} - DATA: ${res.data.count_data}`);
+        }
+      } catch (error) {
+        if (error.code === "ERR_CANCELED") {
+          this.messages.push(`Đã dừng lấy dữ liệu`);
+        } else {
+          this.messages.push(`Lỗi: ${error.message}`);
+        }
+      }
+    },
+    stopRequest() {
+      this.isProcessing = false;
+      controller.abort();
+      window.location.reload();
     }
   },
   computed: {
@@ -152,7 +232,7 @@ export default {
   },
   data() {
     return {
-      chart: new DataCube(Data),
+      // chart: new DataCube(Data),
       width: 1400,
       height: 700,
       colors: {
@@ -176,7 +256,27 @@ export default {
       endDate: null,
       dataSending: null,
       dataExport: [],
+      messages: [],
+      isProcessing: false
     }
   },
 }
 </script>
+
+
+<style scoped>
+.log-info {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.log-info__border {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: green;
+  width: 550px;
+  color: #fff;
+}
+</style>
