@@ -16,8 +16,13 @@
           <div class="card">
             <div class="card-body">
               <div>
-                <div v-for="(message, index) in messages" class=" log-info__border" :key="index">
-                  {{ message }}</div>
+                <div
+                  v-for="(message, index) in messages"
+                  class="log-info__border"
+                  :key="index"
+                >
+                  {{ message }}
+                </div>
               </div>
             </div>
           </div>
@@ -32,7 +37,10 @@
               </div>
               <div class="card-body">
                 <div class="row">
-                  <b-form-select v-model="exchange" :options="exchangeList"></b-form-select>
+                  <b-form-select
+                    v-model="exchange"
+                    :options="exchangeList"
+                  ></b-form-select>
                 </div>
               </div>
             </div>
@@ -45,23 +53,40 @@
               </div>
               <div class="card-body">
                 <div class="row">
-                  <b-form-select v-model="symbol" :options="symbolList"></b-form-select>
+                  <b-form-select
+                    v-model="symbol"
+                    :options="symbolList"
+                  ></b-form-select>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="col-md-12 mt-4">
-            <b-form-datepicker id="startDate" placeholder="Start Date" v-model="startDate" class="mb-2">
+            <b-form-datepicker
+              id="startDate"
+              placeholder="Start Date"
+              v-model="startDate"
+              class="mb-2"
+            >
             </b-form-datepicker>
           </div>
           <div class="col-md-12">
-            <b-form-datepicker id="endDate" placeholder="End Date" v-model="endDate" class="mb-2"></b-form-datepicker>
+            <b-form-datepicker
+              id="endDate"
+              placeholder="End Date"
+              v-model="endDate"
+              class="mb-2"
+            ></b-form-datepicker>
           </div>
 
           <div class="col-md-12 text-center mt-4">
-            <b-button variant="primary" :disabled="isProcessing" @click="handleCallCrobJob()">
-              {{isProcessing ? "Đang lấy Dữ liệu " : "Lấy dữ liệu"}}
+            <b-button
+              variant="primary"
+              :disabled="isProcessing"
+              @click="handleCallCrobJob()"
+            >
+              {{ isProcessing ? "Đang lấy Dữ liệu " : "Lấy dữ liệu" }}
             </b-button>
           </div>
           <div class="col-md-12 text-center mt-4">
@@ -82,63 +107,65 @@
 
 <script>
 // import { TradingVue, DataCube } from 'trading-vue-js'
-import Data from '../data.json'
-import axios from 'axios'
-import service from '@/utils/service';
-import { convertTime } from "@/helper/toTimeStamp"
-import moment from 'moment';
+import Data from "../data.json";
+import axios from "axios";
+import service from "@/utils/service";
+import { convertTime } from "@/helper/toTimeStamp";
+import moment from "moment";
 
 const controller = new AbortController();
 let signal = controller.signal;
 
+const BASE_URL = process.env.VUE_APP_BASE_URL;
+
 export default {
-  name: 'ChartComponent',
+  name: "ChartComponent",
   // components: { TradingVue },
   methods: {
     onResize() {
-      this.width = window.innerWidth - 550
-      this.height = window.innerHeight - 50
+      this.width = window.innerWidth - 550;
+      this.height = window.innerHeight - 50;
     },
     async handleLoadData() {
       switch (this.exchange) {
         case "binance":
           this.dataSending = {
             symbol: this.symbol,
-            interval: '1m',
+            interval: "1m",
             from: convertTime(this.startDate) * 1000,
             to: convertTime(this.endDate) * 1000,
-            limit: 1000
-          }
+            limit: 1000,
+          };
           break;
         case "bitmex":
           this.dataSending = {
             symbol: "ETH_USDT",
-            resolution: '1m',
+            resolution: "1m",
             from: 1654304400,
             to: 1654390800,
-          }
+          };
           break;
       }
 
-      const dataRequest = this.dataSending
+      const dataRequest = this.dataSending;
       const response = await axios.post(
-        'http://localhost:6969/api/binance/ticker',
+        `${BASE_URL}/api/binance/ticker`,
         dataRequest
-      )
-      this.dataExport = response.data.data
+      );
+      this.dataExport = response.data.data;
       Data.ohlcv = response.data.data;
       // this.chart = new DataCube(Data);
     },
     async handleExport() {
-      if(!this.symbol) {
+      if (!this.symbol) {
         return alert("Vui lòng chọn đồng tiền");
       }
       try {
-        const response = await axios.post("http://localhost:3000/api/coin/binance/db", {
+        const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
           symbol: this.symbol,
-        })
-        this.dataExport = response.data.data.ohlcv
-        const rows = this.dataExport
+        });
+        this.dataExport = response.data.data.ohlcv;
+        const rows = this.dataExport;
 
         let csvContent = "data:text/csv;charset=utf-8,";
 
@@ -154,9 +181,8 @@ export default {
 
         link.click();
       } catch (error) {
-        console.log(error)
+        console.log(error);
       }
-
     },
     async handleCallCrobJob() {
       this.isProcessing = true;
@@ -166,33 +192,50 @@ export default {
         return alert("Vui lòng chọn đồng tiền");
       }
       try {
-        const response = await axios.post('http://localhost:3000/api/coin/binance/db', {
+        const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
           symbol: this.symbol,
         });
 
-        const current_time = moment().format('x');
+        const current_time = moment().format("x");
         if (response.data.data && Object.keys(response.data.data).length > 0) {
-          const last_updated = moment(response.data.data.last_updated).format('x');
-          const diff = Math.ceil((current_time - last_updated) / (24 * 60 * 60 * 1000));
+          const last_updated = moment(response.data.data.last_updated).format(
+            "x"
+          );
+          const diff = Math.ceil(
+            (current_time - last_updated) / (24 * 60 * 60 * 1000)
+          );
           for (let i = 0; i <= diff; i++) {
             let startTimeRequestApi = moment(response.data.data.last_updated)
-              .add(i, 'days')
-              .format('YYYY-MM-DD');
-            const res = await axios.post('http://localhost:3000/api/future/coin/init', {
-              symbol: this.symbol,
-              startTime: startTimeRequestApi
-            }, { signal });
-            this.messages.push(`Lấy thành công data ngày ${startTimeRequestApi} - DATA: ${res.data.count_data}`);
+              .add(i, "days")
+              .format("YYYY-MM-DD");
+            const res = await axios.post(
+              `${BASE_URL}/api/future/coin/init`,
+              {
+                symbol: this.symbol,
+                startTime: startTimeRequestApi,
+              },
+              { signal }
+            );
+            this.messages.push(
+              `Lấy thành công data ngày ${startTimeRequestApi} - DATA: ${res.data.count_data}`
+            );
           }
           this.isProcessing = false;
         } else {
-          const res = await axios.post('http://localhost:3000/api/future/coin/init', {
-            symbol: this.symbol,
-            startTime: START_DATE
-          }, {
-            signal
-          });
-          this.messages.push(`Lấy thành công data ngày ${START_DATE} - DATA: ${res.data.count_data}`);
+          const res = await axios.post(
+            `${BASE_URL}/api/future/coin/init`,
+            {
+              symbol: this.symbol,
+              startTime: START_DATE,
+            },
+            {
+              signal,
+            }
+          );
+          this.messages.push(
+            `Lấy thành công data ngày ${START_DATE} - DATA: ${res.data.count_data}`
+          );
+          this.isProcessing = false;
         }
       } catch (error) {
         if (error.code === "ERR_CANCELED") {
@@ -206,29 +249,33 @@ export default {
       this.isProcessing = false;
       controller.abort();
       window.location.reload();
-    }
+    },
   },
   computed: {
     changeSelectExchage() {
-      return this.exchange
+      return this.exchange;
     },
   },
   watch: {
     changeSelectExchage() {
-      service.post("symbol/list", {
-        type: this.exchange
-      }).then((data) => {
-        data && data.map((dt) => {
-          this.symbolList.push({ text: dt.symbol, value: dt.symbol })
+      service
+        .post("symbol/list", {
+          type: this.exchange,
         })
-      }).catch((err) => {
-        console.log(err)
-      })
-    }
+        .then((data) => {
+          data &&
+            data.map((dt) => {
+              this.symbolList.push({ text: dt.symbol, value: dt.symbol });
+            });
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    },
   },
   mounted() {
-    window.addEventListener('resize', this.onResize)
-    this.onResize()
+    window.addEventListener("resize", this.onResize);
+    this.onResize();
   },
   data() {
     return {
@@ -236,31 +283,29 @@ export default {
       width: 1400,
       height: 700,
       colors: {
-        colorBack: '#fff',
-        colorGrid: '#eee',
-        colorText: '#333',
+        colorBack: "#fff",
+        colorGrid: "#eee",
+        colorText: "#333",
       },
       exchange: null,
       exchangeList: [
-        { value: null, text: 'Lựa chọn sàn giao dịch' },
-        { value: 'binance', text: 'Binance' },
-        { value: 'kucoin', text: 'Kucoind' },
-        { value: 'bitmex', text: 'Bitmex' },
-        { value: 'ftx', text: 'FTX' },
+        { value: null, text: "Lựa chọn sàn giao dịch" },
+        { value: "binance", text: "Binance" },
+        { value: "kucoin", text: "Kucoind" },
+        { value: "bitmex", text: "Bitmex" },
+        { value: "ftx", text: "FTX" },
       ],
       symbol: null,
-      symbolList: [
-        { value: null, text: 'Lựa chọn loại tiền tệ' },
-      ],
+      symbolList: [{ value: null, text: "Lựa chọn loại tiền tệ" }],
       startDate: null,
       endDate: null,
       dataSending: null,
       dataExport: [],
       messages: [],
-      isProcessing: false
-    }
+      isProcessing: false,
+    };
   },
-}
+};
 </script>
 
 
