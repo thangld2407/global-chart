@@ -16,17 +16,26 @@
           <div class="card">
             <div class="card-body">
               <div>
-                <div
-                  v-for="(message, index) in messages"
-                  class="log-info__border"
-                  :key="index"
-                >
+                <div v-for="(message, index) in messagesFuture" class="log-info__border" :key="index">
                   {{ message }}
                 </div>
               </div>
             </div>
           </div>
         </div>
+        <br>
+        <div class="log-info">
+          <div class="card">
+            <div class="card-body">
+              <div>
+                <div v-for="(message, index) in messagesNormal" class="log-info__border" :key="index">
+                  {{ message }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
       <div class="col-md-3">
         <div class="row">
@@ -37,10 +46,7 @@
               </div>
               <div class="card-body">
                 <div class="row">
-                  <b-form-select
-                    v-model="exchange"
-                    :options="exchangeList"
-                  ></b-form-select>
+                  <b-form-select v-model="exchange" :options="exchangeList"></b-form-select>
                 </div>
               </div>
             </div>
@@ -53,50 +59,45 @@
               </div>
               <div class="card-body">
                 <div class="row">
-                  <b-form-select
-                    v-model="symbol"
-                    :options="symbolList"
-                  ></b-form-select>
+                  <b-form-select v-model="symbol" :options="symbolList"></b-form-select>
                 </div>
               </div>
             </div>
           </div>
 
           <div class="col-md-12 mt-4">
-            <b-form-datepicker
-              id="startDate"
-              placeholder="Start Date"
-              v-model="startDate"
-              class="mb-2"
-            >
+            <b-form-datepicker id="startDate" placeholder="Start Date" v-model="startDate" class="mb-2">
             </b-form-datepicker>
           </div>
           <div class="col-md-12">
-            <b-form-datepicker
-              id="endDate"
-              placeholder="End Date"
-              v-model="endDate"
-              class="mb-2"
-            ></b-form-datepicker>
+            <b-form-datepicker id="endDate" placeholder="End Date" v-model="endDate" class="mb-2"></b-form-datepicker>
           </div>
 
           <div class="col-md-12 text-center mt-4">
-            <b-button
-              variant="primary"
-              :disabled="isProcessing"
-              @click="handleCallCrobJob()"
-            >
-              {{ isProcessing ? "Đang lấy Dữ liệu " : "Lấy dữ liệu" }}
+            <b-button variant="primary" :disabled="isProcessing" @click="handleCallCronJobFuture()">
+              {{ isProcessing ? "Đang lấy Dữ liệu " : "Lấy dữ liệu Future" }}
             </b-button>
           </div>
+
+          <div class="col-md-12 text-center mt-4">
+            <b-button variant="primary" :disabled="isProcessingNormal" @click="handleCallCronJobNormal()">
+              {{ isProcessingNormal ? "Đang lấy Dữ liệu " : "Lấy dữ liệu Spot" }}
+            </b-button>
+          </div>
+
           <div class="col-md-12 text-center mt-4">
             <b-button variant="danger" @click="stopRequest()">
               Dừng lấy dữ liệu
             </b-button>
           </div>
           <div class="col-md-12 text-center mt-4">
-            <b-button variant="primary " @click="handleExport()">
-              Tải về CSV
+            <b-button variant="primary " @click="handleExportFuture()">
+              Tải về CSV Future
+            </b-button>
+          </div>
+          <div class="col-md-12 text-center mt-4">
+            <b-button variant="primary " @click="handleExportSpot()">
+              Tải về CSV Spot
             </b-button>
           </div>
         </div>
@@ -156,15 +157,18 @@ export default {
       Data.ohlcv = response.data.data;
       // this.chart = new DataCube(Data);
     },
-    async handleExport() {
+
+    async handleExportFuture() {
       if (!this.symbol) {
         return alert("Vui lòng chọn đồng tiền");
       }
       try {
         const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
           symbol: this.symbol,
+          type_contract: "PERPETUAL"
         });
         this.dataExport = response.data.data.ohlcv;
+        console.log(this.dataExport);
         const rows = this.dataExport;
 
         let csvContent = "data:text/csv;charset=utf-8,";
@@ -184,7 +188,38 @@ export default {
         console.log(error);
       }
     },
-    async handleCallCrobJob() {
+
+    async handleExportSpot() {
+      if (!this.symbol) {
+        return alert("Vui lòng chọn đồng tiền");
+      }
+      try {
+        const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
+          symbol: this.symbol,
+          type_contract: "NORMAL"
+        });
+        this.dataExportSpot = response.data.data.ohlcv;
+        const rows = this.dataExportSpot;
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+
+        rows.forEach(function (rowArray) {
+          let row = rowArray.join(",");
+          csvContent += row + "\r\n";
+        });
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "my_data.csv");
+        document.body.appendChild(link);
+
+        link.click();
+      } catch (error) {
+        console.log(error);
+      }
+    },
+
+    async handleCallCronJobFuture() {
       this.isProcessing = true;
       let START_DATE = "2019-09-09";
       if (!this.symbol) {
@@ -194,6 +229,7 @@ export default {
       try {
         const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
           symbol: this.symbol,
+          type_contract: "PERPETUAL"
         });
 
         const current_time = moment().format("x");
@@ -216,7 +252,7 @@ export default {
               },
               { signal }
             );
-            this.messages.push(
+            this.messagesFuture.push(
               `Lấy thành công data ngày ${startTimeRequestApi} - DATA: ${res.data.count_data}`
             );
           }
@@ -232,16 +268,79 @@ export default {
               signal,
             }
           );
-          this.messages.push(
+          this.messagesFuture.push(
             `Lấy thành công data ngày ${START_DATE} - DATA: ${res.data.count_data}`
           );
           this.isProcessing = false;
         }
       } catch (error) {
         if (error.code === "ERR_CANCELED") {
-          this.messages.push(`Đã dừng lấy dữ liệu`);
+          this.messagesFuture.push(`Đã dừng lấy dữ liệu`);
         } else {
-          this.messages.push(`Lỗi: ${error.message}`);
+          this.messagesFuture.push(`Lỗi: ${error.message}`);
+        }
+      }
+    },
+
+    async handleCallCronJobNormal() {
+      this.isProcessingNormal = true;
+      let START_DATE = "2019-09-09";
+      if (!this.symbol) {
+        this.isProcessingNormal = false;
+        return alert("Vui lòng chọn đồng tiền");
+      }
+      try {
+        const response = await axios.post(`${BASE_URL}/api/coin/binance/db`, {
+          symbol: this.symbol,
+          type_contract: "NORMAL"
+        });
+
+        const current_time = moment().format("x");
+        if (response.data.data && Object.keys(response.data.data).length > 0) {
+          const last_updated = moment(response.data.data.last_updated).format(
+            "x"
+          );
+          const diff = Math.ceil(
+            (current_time - last_updated) / (24 * 60 * 60 * 1000)
+          );
+          for (let i = 0; i <= diff; i++) {
+            let startTimeRequestApi = moment(response.data.data.last_updated)
+              .add(i, "days")
+              .format("YYYY-MM-DD");
+            const res = await axios.post(
+              `${BASE_URL}/api/coin/binance`,
+              {
+                symbol: this.symbol,
+                startTime: startTimeRequestApi,
+              },
+              { signal }
+            );
+            this.messagesNormal.push(
+              `Lấy thành công data ngày ${startTimeRequestApi} - DATA: ${res.data.count_data}`
+            );
+          }
+          this.isProcessingNormal = false;
+        } else {
+          const res = await axios.post(
+            `${BASE_URL}/api/coin/binance`,
+            {
+              symbol: this.symbol,
+              startTime: START_DATE,
+            },
+            {
+              signal,
+            }
+          );
+          this.messagesNormal.push(
+            `Lấy thành công data ngày ${START_DATE} - DATA: ${res.data.count_data}`
+          );
+          this.isProcessingNormal = false;
+        }
+      } catch (error) {
+        if (error.code === "ERR_CANCELED") {
+          this.messagesNormal.push(`Đã dừng lấy dữ liệu`);
+        } else {
+          this.messagesNormal.push(`Lỗi: ${error.message}`);
         }
       }
     },
@@ -301,8 +400,11 @@ export default {
       endDate: null,
       dataSending: null,
       dataExport: [],
-      messages: [],
+      messagesFuture: [],
       isProcessing: false,
+      messagesNormal: [],
+      dataExportSpot: [],
+      isProcessingNormal: false,
     };
   },
 };
@@ -311,7 +413,7 @@ export default {
 
 <style scoped>
 .log-info {
-  max-height: calc(100vh - 200px);
+  max-height: 300px;
   overflow-y: auto;
 }
 
